@@ -1039,7 +1039,9 @@ setInterval(poll,3000);
 
 HTMLEOF
 
-  msg_ok "Dashboard generated at ${INSTALL_DIR}/${DASHBOARD_FILE}"
+  # Patch the API URL with the actual host IP detected at install time
+  sed -i "s|http://10\.100\.102\.18:${API_PORT}|http://${HOST_IP}:${API_PORT}|g" "${INSTALL_DIR}/${DASHBOARD_FILE}"
+  msg_ok "Dashboard generated at ${INSTALL_DIR}/${DASHBOARD_FILE} (API → http://${HOST_IP}:${API_PORT})"
 }
 
 # ── Create Systemd Service ───────────────────────────────────────────

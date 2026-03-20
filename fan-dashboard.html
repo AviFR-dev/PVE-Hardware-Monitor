@@ -335,7 +335,7 @@ canvas{display:block;width:100%!important}
 <div class="toast" id="toast"></div>
 
 <script>
-const API = 'http://10.100.102.18:9099';
+const API = window.location.origin.includes('file://') ? 'http://10.100.102.18:9099' : window.location.origin;
 const CIRC = 2 * Math.PI * 30; // ~188 for r=30
 const H = { cpuR:[], gpuR:[], cpuT:[], nvmeT:[] };
 const MAX = 100;
