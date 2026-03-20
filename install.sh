@@ -450,6 +450,10 @@ def get_fans_ec():
         duty   = struct.unpack('B',  duty_b)[0] if duty_b else 0
         rpm    = round(2156250 / raw) if raw > 0 else 0
         fans.append({'name': name, 'rpm': rpm, 'raw': raw, 'duty': duty, 'source': 'ec'})
+    # If all raw values are 0 the EC is unreadable (permission issue or fans stopped)
+    # Return empty so the caller falls back to hwmon
+    if all(f['raw'] == 0 for f in fans):
+        return []
     return fans
 
 # ── IPMI helpers ─────────────────────────────────────────────────────
@@ -1565,9 +1569,22 @@ create_service() {
 
   # Grant pve-hwmon access to required paths
   chown -R pve-hwmon:pve-hwmon "${INSTALL_DIR}"
-  # EC access (laptops)
-  if [[ "$HAS_EC" == "true" ]] && command -v setfacl &>/dev/null; then
-    setfacl -m u:pve-hwmon:r "${EC_PATH:-/sys/kernel/debug/ec/ec0/io}" 2>/dev/null || true
+  # EC access (laptops) — grant read on the EC io file and debug dir
+  if [[ "$HAS_EC" == "true" ]]; then
+    if command -v setfacl &>/dev/null; then
+      setfacl -m u:pve-hwmon:rx /sys/kernel/debug 2>/dev/null || true
+      setfacl -m u:pve-hwmon:rx /sys/kernel/debug/ec 2>/dev/null || true
+      setfacl -m u:pve-hwmon:rx /sys/kernel/debug/ec/ec0 2>/dev/null || true
+      setfacl -m u:pve-hwmon:r  /sys/kernel/debug/ec/ec0/io 2>/dev/null || true
+      msg_ok "EC debug ACLs set for pve-hwmon"
+    else
+      apt-get install -y -qq acl >/dev/null 2>&1
+      setfacl -m u:pve-hwmon:rx /sys/kernel/debug 2>/dev/null || true
+      setfacl -m u:pve-hwmon:rx /sys/kernel/debug/ec 2>/dev/null || true
+      setfacl -m u:pve-hwmon:rx /sys/kernel/debug/ec/ec0 2>/dev/null || true
+      setfacl -m u:pve-hwmon:r  /sys/kernel/debug/ec/ec0/io 2>/dev/null || true
+      msg_ok "EC debug ACLs set for pve-hwmon"
+    fi
   fi
   # IPMI group access (servers)
   if [[ "$HAS_IPMI" == "true" ]] && getent group ipmi &>/dev/null; then
@@ -1596,7 +1613,13 @@ NoNewPrivileges=yes
 PrivateTmp=yes
 ProtectSystem=strict
 ReadWritePaths=${INSTALL_DIR}
+ReadOnlyPaths=/sys/kernel/debug
 ProtectHome=yes
+# Allow reading EC registers and IPMI device nodes
+CapabilityBoundingSet=CAP_SYS_RAWIO CAP_DAC_READ_SEARCH
+AmbientCapabilities=CAP_SYS_RAWIO CAP_DAC_READ_SEARCH
+DeviceAllow=/dev/ipmi0 rw
+DeviceAllow=/dev/ipmi/0 rw
 
 [Install]
 WantedBy=multi-user.target

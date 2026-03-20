@@ -140,6 +140,9 @@ def get_fans_ec():
         duty   = struct.unpack('B',  duty_b)[0] if duty_b else 0
         rpm    = round(2156250 / raw) if raw > 0 else 0
         fans.append({'name': name, 'rpm': rpm, 'raw': raw, 'duty': duty, 'source': 'ec'})
+    # If all raw values are 0 the EC is unreadable — fall back to hwmon
+    if all(f['raw'] == 0 for f in fans):
+        return []
     return fans
 
 # ── IPMI helpers ─────────────────────────────────────────────────────
