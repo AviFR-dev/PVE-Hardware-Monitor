@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GL503VM System Monitor</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=DM+Sans:wght@400;500;600;700&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#06090d;--s1:#0c1117;--s2:#111922;--s3:#172030;
+  --bdr:#1a2640;--bdr2:#243352;
+  --tx:#cdd8e8;--dim:#4a6080;--dim2:#2d4060;
+  --blue:#2d7ff9;--cyan:#00c2d1;--green:#00d48a;--amber:#ffb020;--red:#ff4060;--violet:#9775fa;
+  --blue-g:rgba(45,127,249,.08);--cyan-g:rgba(0,194,209,.08);--green-g:rgba(0,212,138,.08);
+}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);min-height:100vh;overflow-x:hidden}
+.noise{position:fixed;inset:0;opacity:.02;pointer-events:none;background:url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.7' numOctaves='5' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+.orb{position:fixed;border-radius:50%;filter:blur(120px);pointer-events:none;opacity:.04}
+.orb1{width:500px;height:500px;top:-150px;left:-80px;background:var(--blue)}
+.orb2{width:400px;height:400px;bottom:-100px;right:-50px;background:var(--cyan)}
+
+.app{max-width:1080px;margin:0 auto;padding:24px 16px;position:relative;z-index:1}
+
+/* Header */
+.hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;padding-bottom:16px;border-bottom:1px solid var(--bdr)}
+.brand{display:flex;align-items:center;gap:12px}
+.brand-mark{width:36px;height:36px;border-radius:8px;background:linear-gradient(135deg,var(--blue),var(--cyan));display:grid;place-items:center;font-size:18px;box-shadow:0 0 20px rgba(45,127,249,.2)}
+.brand h1{font-size:16px;font-weight:600;letter-spacing:-.3px}
+.brand small{display:block;font-size:10px;font-family:'IBM Plex Mono',monospace;color:var(--dim);margin-top:1px;letter-spacing:.5px}
+.conn{display:flex;align-items:center;gap:6px;font-size:10px;font-family:'IBM Plex Mono',monospace;color:var(--dim);padding:5px 12px;background:var(--s1);border:1px solid var(--bdr);border-radius:99px}
+.conn-dot{width:6px;height:6px;border-radius:50%;background:var(--red);transition:background .3s}
+.conn-dot.ok{background:var(--green);box-shadow:0 0 8px rgba(0,212,138,.4)}
+
+/* Grid */
+.g{display:grid;gap:12px;margin-bottom:12px}
+.g2{grid-template-columns:1fr 1fr}
+.g3{grid-template-columns:1fr 1fr 1fr}
+.g4{grid-template-columns:1fr 1fr 1fr 1fr}
+
+/* Card */
+.c{background:var(--s1);border:1px solid var(--bdr);border-radius:10px;padding:16px;position:relative;overflow:hidden;transition:border-color .25s}
+.c:hover{border-color:var(--bdr2)}
+.c-full{grid-column:1/-1}
+.c-glow{position:absolute;top:-25px;right:-25px;width:70px;height:70px;border-radius:50%;filter:blur(30px);opacity:.06}
+
+/* Labels */
+.lbl{font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.8px;color:var(--dim);margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.lbl-dot{width:6px;height:6px;border-radius:2px}
+.tag{font-family:'IBM Plex Mono',monospace;font-size:9px;padding:2px 6px;border-radius:4px;background:var(--s2);border:1px solid var(--bdr);color:var(--dim)}
+
+/* Big number */
+.big{font-family:'IBM Plex Mono',monospace;font-size:38px;font-weight:600;line-height:1;letter-spacing:-2px;margin-bottom:2px}
+.mid{font-family:'IBM Plex Mono',monospace;font-size:22px;font-weight:500;line-height:1;letter-spacing:-1px}
+.unit{font-size:12px;color:var(--dim);font-weight:400;margin-left:2px}
+.sub{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--dim);margin-top:2px}
+
+/* Bar */
+.bar-bg{width:100%;height:3px;background:var(--s3);border-radius:2px;margin:8px 0;overflow:hidden}
+.bar-f{height:100%;border-radius:2px;transition:width .5s cubic-bezier(.22,1,.36,1)}
+
+/* Mini stat */
+.ms{display:flex;justify-content:space-between;font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--dim);padding:4px 0}
+.ms b{color:var(--tx);font-weight:500}
+
+/* Mode buttons */
+.modes{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.mbtn{padding:12px 10px;border:1px solid var(--bdr);border-radius:8px;background:var(--s2);color:var(--tx);cursor:pointer;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;transition:all .2s;text-align:center}
+.mbtn:hover{border-color:var(--bdr2);background:var(--s3)}
+.mbtn.on{border-color:var(--blue);background:var(--blue-g);color:var(--blue)}
+.mbtn.on.boost{border-color:var(--red);background:rgba(255,64,96,.06);color:var(--red)}
+.mbtn.on.silent{border-color:var(--green);background:var(--green-g);color:var(--green)}
+.mbtn em{font-style:normal;font-size:16px;display:block;margin-bottom:2px}
+.mbtn span{font-size:8px;color:var(--dim);display:block;margin-top:1px;font-family:'IBM Plex Mono',monospace}
+
+/* Temp grid */
+.tg{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:6px}
+.tg-item{background:var(--s2);border-radius:6px;padding:8px 10px;text-align:center}
+.tg-item .val{font-family:'IBM Plex Mono',monospace;font-size:16px;font-weight:500}
+.tg-item .name{font-size:9px;color:var(--dim);margin-top:2px;font-family:'IBM Plex Mono',monospace}
+
+/* Chart */
+canvas{width:100%!important;height:120px!important}
+
+/* Toast */
+.toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--s1);border:1px solid var(--bdr);border-radius:8px;padding:8px 16px;font-size:11px;z-index:99;transition:transform .3s cubic-bezier(.22,1,.36,1);box-shadow:0 4px 20px rgba(0,0,0,.5)}
+.toast.show{transform:translateX(-50%) translateY(0)}
+.toast.ok{border-color:rgba(0,212,138,.4)}.toast.err{border-color:rgba(255,64,96,.4)}
+
+/* Battery bar */
+.bat-shell{width:100%;height:16px;background:var(--s3);border-radius:4px;overflow:hidden;position:relative}
+.bat-fill{height:100%;border-radius:4px;transition:width .5s}
+.bat-text{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:500;color:var(--tx)}
+
+/* Footer */
+.ftr{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--dim);display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;padding-top:10px;border-top:1px solid var(--bdr);margin-top:4px}
+.ftr b{color:var(--tx);font-weight:500}
+
+/* Animations */
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.c{animation:fadeUp .4s ease both}
+.g .c:nth-child(1){animation-delay:0s}.g .c:nth-child(2){animation-delay:.05s}.g .c:nth-child(3){animation-delay:.1s}.g .c:nth-child(4){animation-delay:.15s}
+
+@media(max-width:700px){.g2,.g3,.g4{grid-template-columns:1fr}.hdr{flex-direction:column;gap:10px;align-items:flex-start}.ftr{flex-direction:column}}
+</style>
+</head>
+<body>
+<div class="noise"></div><div class="orb orb1"></div><div class="orb orb2"></div>
+<div class="app">
+  <div class="hdr">
+    <div class="brand"><div class="brand-mark">🌀</div><div><h1>System Monitor</h1><small>ASUS ROG Strix GL503VM · Proxmox VE</small></div></div>
+    <div class="conn"><div class="conn-dot" id="dot"></div><span id="stxt">CONNECTING</span></div>
+  </div>
+
+  <!-- Fan Cards -->
+  <div class="g g2">
+    <div class="c" id="cpuC">
+      <div class="c-glow" style="background:var(--blue)"></div>
+      <div class="lbl"><div class="lbl-dot" style="background:var(--blue)"></div>CPU FAN<span style="flex:1"></span><span class="tag" id="cpuD">0/8</span></div>
+      <div class="big" style="color:var(--blue)" id="cpuR">--<span class="unit">RPM</span></div>
+      <div class="bar-bg"><div class="bar-f" id="cpuB" style="width:0%;background:linear-gradient(90deg,var(--blue),var(--cyan))"></div></div>
+      <div class="ms"><span>Temperature</span><b id="cpuT">--°C</b></div>
+      <div class="ms"><span>EC Raw</span><b id="cpuW">--</b></div>
+    </div>
+    <div class="c">
+      <div class="c-glow" style="background:var(--cyan)"></div>
+      <div class="lbl"><div class="lbl-dot" style="background:var(--cyan)"></div>GPU FAN<span style="flex:1"></span><span class="tag" id="gpuD">0/8</span></div>
+      <div class="big" style="color:var(--cyan)" id="gpuR">--<span class="unit">RPM</span></div>
+      <div class="bar-bg"><div class="bar-f" id="gpuB" style="width:0%;background:linear-gradient(90deg,var(--cyan),var(--green))"></div></div>
+      <div class="ms"><span>Temperature</span><b id="gpuT">--°C</b></div>
+      <div class="ms"><span>EC Raw</span><b id="gpuW">--</b></div>
+    </div>
+  </div>
+
+  <!-- Temps + Battery + System -->
+  <div class="g g3">
+    <!-- Core Temps -->
+    <div class="c">
+      <div class="lbl"><div class="lbl-dot" style="background:var(--amber)"></div>CPU CORES</div>
+      <div class="tg" id="coreGrid"></div>
+      <div class="ms" style="margin-top:8px"><span>EC Temp</span><b id="ecT">--°C</b></div>
+      <div class="ms"><span>PCH</span><b id="pchT">--°C</b></div>
+    </div>
+    <!-- NVMe -->
+    <div class="c">
+      <div class="lbl"><div class="lbl-dot" style="background:var(--violet)"></div>NVME STORAGE</div>
+      <div class="tg" id="nvmeGrid"></div>
+    </div>
+    <!-- Battery -->
+    <div class="c">
+      <div class="lbl"><div class="lbl-dot" style="background:var(--green)"></div>BATTERY</div>
+      <div class="mid" id="batPct" style="color:var(--green)">--<span class="unit">%</span></div>
+      <div class="sub" id="batSt">--</div>
+      <div class="bat-shell" style="margin-top:8px">
+        <div class="bat-fill" id="batBar" style="width:0%;background:var(--green)"></div>
+        <div class="bat-text" id="batTxt">--</div>
+      </div>
+      <div class="ms" style="margin-top:8px"><span>Power</span><b id="batP">-- W</b></div>
+      <div class="ms"><span>Voltage</span><b id="batV">-- V</b></div>
+      <div class="ms"><span>Energy</span><b id="batE">-- / -- Wh</b></div>
+    </div>
+  </div>
+
+  <!-- System + Fan Profile -->
+  <div class="g g2">
+    <!-- System -->
+    <div class="c">
+      <div class="lbl"><div class="lbl-dot" style="background:var(--dim)"></div>SYSTEM</div>
+      <div class="ms"><span>Uptime</span><b id="sUp">--</b></div>
+      <div class="ms"><span>Load (1/5/15)</span><b id="sLoad">--</b></div>
+      <div class="ms"><span>Memory</span><b id="sMem">--</b></div>
+      <div class="bar-bg"><div class="bar-f" id="memBar" style="width:0%;background:var(--amber)"></div></div>
+    </div>
+    <!-- Fan Profile -->
+    <div class="c">
+      <div class="lbl"><div class="lbl-dot" style="background:var(--blue)"></div>FAN PROFILE</div>
+      <div class="modes">
+        <button class="mbtn silent" id="m2" onclick="setMode(2)"><em>🤫</em>Silent<span>Quiet</span></button>
+        <button class="mbtn" id="m0" onclick="setMode(0)"><em>⚖️</em>Normal<span>Default</span></button>
+        <button class="mbtn boost" id="m1" onclick="setMode(1)"><em>🔥</em>Boost<span>Max</span></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chart -->
+  <div class="g">
+    <div class="c c-full">
+      <div class="lbl">HISTORY — 5 MINUTES</div>
+      <canvas id="chart"></canvas>
+    </div>
+  </div>
+
+  <div class="ftr">
+    <span>Model: <b>GL503VM</b></span>
+    <span>BIOS: <b>316</b></span>
+    <span>Mode: <b id="fMode">--</b></span>
+    <span>Updated: <b id="fTime">--</b></span>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const API='http://10.100.102.18:9099';
+const H={cpuR:[],gpuR:[],temp:[],labels:[]};
+const MAX=100;
+
+function fmt_uptime(s){if(!s)return'--';const d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);return d?`${d}d ${h}h ${m}m`:`${h}h ${m}m`}
+function tc(id,t){const e=document.getElementById(id);if(!e||!t)return;e.style.color=t>80?'var(--red)':t>65?'var(--amber)':'var(--green)'}
+
+function drawChart(){
+  const cv=document.getElementById('chart'),ctx=cv.getContext('2d');
+  const dpr=window.devicePixelRatio||1,rect=cv.getBoundingClientRect();
+  cv.width=rect.width*dpr;cv.height=120*dpr;ctx.scale(dpr,dpr);
+  const W=rect.width,HH=120;ctx.clearRect(0,0,W,HH);
+  if(H.cpuR.length<2)return;
+  const n=H.cpuR.length,maxR=Math.max(300,...H.cpuR,...H.gpuR),maxT=Math.max(60,...H.temp),minT=Math.min(30,...H.temp);
+  const p={t:8,b:20,l:0,r:0},cw=W-p.l-p.r,ch=HH-p.t-p.b;
+  const x=i=>p.l+(i/(n-1))*cw,yR=v=>p.t+ch-(v/maxR)*ch,yT=v=>p.t+ch-((v-minT+3)/(maxT-minT+6))*ch;
+
+  ctx.strokeStyle='rgba(26,38,64,.6)';ctx.lineWidth=.5;
+  for(let i=0;i<3;i++){const y=p.t+(ch/2)*i;ctx.beginPath();ctx.moveTo(p.l,y);ctx.lineTo(W-p.r,y);ctx.stroke()}
+
+  // CPU fill
+  ctx.beginPath();H.cpuR.forEach((v,i)=>i?ctx.lineTo(x(i),yR(v)):ctx.moveTo(x(i),yR(v)));
+  ctx.lineTo(x(n-1),HH-p.b);ctx.lineTo(x(0),HH-p.b);ctx.closePath();ctx.fillStyle='rgba(45,127,249,.04)';ctx.fill();
+
+  // Lines
+  [[H.cpuR,'#2d7ff9',1.5],[H.gpuR,'#00c2d1',1.5]].forEach(([d,c,w])=>{
+    ctx.beginPath();ctx.strokeStyle=c;ctx.lineWidth=w;ctx.lineJoin='round';
+    d.forEach((v,i)=>i?ctx.lineTo(x(i),yR(v)):ctx.moveTo(x(i),yR(v)));ctx.stroke()
+  });
+  ctx.beginPath();ctx.strokeStyle='#ffb020';ctx.lineWidth=1;ctx.setLineDash([3,3]);ctx.lineJoin='round';
+  H.temp.forEach((v,i)=>i?ctx.lineTo(x(i),yT(v)):ctx.moveTo(x(i),yT(v)));ctx.stroke();ctx.setLineDash([]);
+
+  ctx.font='9px IBM Plex Mono';ctx.fillStyle='#2d7ff9';ctx.fillText('CPU',4,HH-4);
+  ctx.fillStyle='#00c2d1';ctx.fillText('GPU',36,HH-4);
+  ctx.fillStyle='#ffb020';ctx.fillText('TEMP',68,HH-4);
+  ctx.textAlign='right';
+  ctx.fillStyle='#2d7ff9';ctx.fillText(H.cpuR[n-1]+' RPM',W-4,p.t+10);
+  ctx.fillStyle='#00c2d1';ctx.fillText(H.gpuR[n-1]+' RPM',W-4,p.t+20);
+  ctx.fillStyle='#ffb020';ctx.fillText(H.temp[n-1]+'°C',W-4,p.t+30);
+  ctx.textAlign='left';
+}
+
+async function poll(){
+  try{
+    const r=await fetch(API+'/api/status',{signal:AbortSignal.timeout(3000)});
+    const d=await r.json();if(!d.ok)throw 0;
+    document.getElementById('dot').className='conn-dot ok';
+    document.getElementById('stxt').textContent='CONNECTED';
+
+    const c=d.fans[0]||{},g=d.fans[1]||{};
+    const mxR=6000;
+
+    document.getElementById('cpuR').innerHTML=`${c.rpm||0}<span class="unit">RPM</span>`;
+    document.getElementById('cpuB').style.width=Math.min(100,(c.rpm||0)/mxR*100)+'%';
+    document.getElementById('cpuD').textContent=(c.duty??'-')+'/8';
+    document.getElementById('cpuT').textContent=(d.cpu_temp||0)+'°C';tc('cpuT',d.cpu_temp);
+    document.getElementById('cpuW').textContent=c.raw||'--';
+
+    document.getElementById('gpuR').innerHTML=`${g.rpm||0}<span class="unit">RPM</span>`;
+    document.getElementById('gpuB').style.width=Math.min(100,(g.rpm||0)/mxR*100)+'%';
+    document.getElementById('gpuD').textContent=(g.duty??'-')+'/8';
+    document.getElementById('gpuT').textContent=(d.cpu_temp||0)+'°C';tc('gpuT',d.cpu_temp);
+    document.getElementById('gpuW').textContent=g.raw||'--';
+
+    // Cores
+    const cg=document.getElementById('coreGrid');
+    if(d.core_temps&&d.core_temps.length){
+      cg.innerHTML=d.core_temps.map(c=>`<div class="tg-item"><div class="val" style="color:${c.temp>80?'var(--red)':c.temp>65?'var(--amber)':'var(--green)'}">${c.temp}°</div><div class="name">${c.label}</div></div>`).join('')
+    }
+    document.getElementById('ecT').textContent=(d.ec_temp||'--')+'°C';
+    document.getElementById('pchT').textContent=(d.pch_temp||'--')+'°C';
+
+    // NVMe
+    const ng=document.getElementById('nvmeGrid');
+    if(d.nvme&&d.nvme.length){
+      ng.innerHTML=d.nvme.map(n=>`<div class="tg-item"><div class="val" style="color:${n.temp>70?'var(--red)':n.temp>55?'var(--amber)':'var(--violet)'}">${n.temp}°</div><div class="name">${n.label}</div></div>`).join('')
+    }
+
+    // Battery
+    const b=d.battery;
+    if(b){
+      document.getElementById('batPct').innerHTML=`${b.capacity??'--'}<span class="unit">%</span>`;
+      document.getElementById('batSt').textContent=b.status;
+      const bp=b.capacity||0;
+      document.getElementById('batBar').style.width=bp+'%';
+      document.getElementById('batBar').style.background=bp<20?'var(--red)':bp<50?'var(--amber)':'var(--green)';
+      document.getElementById('batTxt').textContent=bp+'%';
+      document.getElementById('batP').textContent=(b.power||'--')+' W';
+      document.getElementById('batV').textContent=(b.voltage||'--')+' V';
+      document.getElementById('batE').textContent=`${b.energy_now||'--'} / ${b.energy_full||'--'} Wh`;
+      document.getElementById('batPct').style.color=bp<20?'var(--red)':bp<50?'var(--amber)':'var(--green)';
+    }
+
+    // System
+    const s=d.system;
+    if(s){
+      document.getElementById('sUp').textContent=fmt_uptime(s.uptime_s);
+      document.getElementById('sLoad').textContent=s.load?s.load.join(' / '):'--';
+      if(s.mem&&s.mem.total){
+        document.getElementById('sMem').textContent=`${s.mem.used} / ${s.mem.total} MB (${s.mem.pct}%)`;
+        document.getElementById('memBar').style.width=s.mem.pct+'%';
+      }
+    }
+
+    // Mode
+    document.getElementById('fMode').textContent=d.mode;
+    document.getElementById('fTime').textContent=new Date().toLocaleTimeString();
+    ['m0','m1','m2'].forEach(id=>{document.getElementById(id).classList.toggle('on',d.mode_raw===parseInt(id[1]))});
+
+    // History
+    H.cpuR.push(c.rpm||0);H.gpuR.push(g.rpm||0);H.temp.push(d.cpu_temp||0);
+    if(H.cpuR.length>MAX){H.cpuR.shift();H.gpuR.shift();H.temp.shift()}
+    drawChart();
+  }catch(e){
+    document.getElementById('dot').className='conn-dot';
+    document.getElementById('stxt').textContent='DISCONNECTED';
+  }
+}
+
+async function setMode(m){
+  try{
+    const r=await fetch(API+'/api/mode',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:m}),signal:AbortSignal.timeout(5000)});
+    const d=await r.json();
+    if(d.ok)toast('ok','✓ '+d.msg);else toast('err','✗ '+(d.error||'Failed'));
+    setTimeout(poll,500);
+  }catch(e){toast('err','✗ Connection failed')}
+}
+
+function toast(t,m){const e=document.getElementById('toast');e.textContent=m;e.className='toast '+t+' show';setTimeout(()=>e.className='toast',3000)}
+window.addEventListener('resize',drawChart);
+poll();setInterval(poll,3000);
+</script>
+</body>
+</html>
