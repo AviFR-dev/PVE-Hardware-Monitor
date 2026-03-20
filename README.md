@@ -2,7 +2,7 @@
 
 Real-time hardware monitoring dashboard for Proxmox VE hosts. Displays fan RPM, CPU/NVMe/PCH temperatures, battery status, IPMI sensors, and system metrics through a sleek web interface.
 
-![Dashboard Preview](docs/preview.png)
+![Dashboard Preview](https://github.com/AviFR-dev/PVE-Hardware-Monitor/blob/main/preview.png)
 
 > ⚠️ **Early-stage project.** Tested on a limited set of hardware. IPMI support in particular is new and may behave differently across server vendors and firmware versions. Bugs are expected — please open an issue if you run into one.
 
