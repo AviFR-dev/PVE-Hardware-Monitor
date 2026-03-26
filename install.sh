@@ -303,9 +303,13 @@ generate_config() {
 
   mkdir -p "${INSTALL_DIR}"
 
-  # Escape strings for JSON
+  # Escape strings for JSON (outputs properly quoted JSON string or "null")
   escape_json() {
-    printf '%s' "$1" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))' | tr -d '"'
+    if [[ -z "$1" ]]; then
+      echo "null"
+    else
+      printf '%s' "$1" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))'
+    fi
   }
 
   SYSTEM_MODEL_ESC=$(escape_json "$SYSTEM_MODEL")
@@ -349,11 +353,11 @@ generate_config() {
     "ipmi_has_voltage": ${IPMI_HAS_VOLTAGE},
     "paths": {
       "ec_path": "/sys/kernel/debug/ec/ec0/io",
-      "boost_path": ${BOOST_PATH_ESC},
-      "bat_path": ${BAT_PATH_ESC},
-      "hw_coretemp": ${HW_CORETEMP_ESC},
-      "hw_nvme": ${HW_NVME_ESC},
-      "hw_pch": ${HW_PCH_ESC}
+      "boost_path": __BOOST_PATH__,
+      "bat_path": __BAT_PATH__,
+      "hw_coretemp": __HW_CORETEMP__,
+      "hw_nvme": __HW_NVME__,
+      "hw_pch": __HW_PCH__
     }
   },
   "alert": {
@@ -389,6 +393,14 @@ generate_config() {
 EOF
 
   chmod 600 "${INSTALL_DIR}/${CONFIG_FILE}"
+
+  # Use sed to replace placeholders
+  sed -i "s|__BOOST_PATH__|${BOOST_PATH_ESC:-null}|g" "${INSTALL_DIR}/${CONFIG_FILE}"
+  sed -i "s|__BAT_PATH__|${BAT_PATH_ESC:-null}|g" "${INSTALL_DIR}/${CONFIG_FILE}"
+  sed -i "s|__HW_CORETEMP__|${HW_CORETEMP_ESC:-null}|g" "${INSTALL_DIR}/${CONFIG_FILE}"
+  sed -i "s|__HW_NVME__|${HW_NVME_ESC:-null}|g" "${INSTALL_DIR}/${CONFIG_FILE}"
+  sed -i "s|__HW_PCH__|${HW_PCH_ESC:-null}|g" "${INSTALL_DIR}/${CONFIG_FILE}"
+
   msg_ok "Configuration saved to ${INSTALL_DIR}/${CONFIG_FILE}"
 }
 
